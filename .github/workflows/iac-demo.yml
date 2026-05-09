@@ -64,7 +64,12 @@ jobs:
             "auth_uri": "https://accounts.google.com/o/oauth2/auth",
             "token_uri": "https://oauth2.googleapis.com/token"
           }' "$PRIVATE_KEY" > /tmp/mock-credentials.json
-          echo "GOOGLE_CREDENTIALS=$(cat /tmp/mock-credentials.json)" >> $GITHUB_ENV
+          # Multi-line values must use heredoc delimiter format in GITHUB_ENV
+          {
+            echo "GOOGLE_CREDENTIALS<<GCPCREDS_EOF"
+            cat /tmp/mock-credentials.json
+            echo "GCPCREDS_EOF"
+          } >> "$GITHUB_ENV"
 
       - name: Terraform Init
         working-directory: terraform/
