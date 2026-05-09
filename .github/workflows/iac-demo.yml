@@ -11,11 +11,9 @@ jobs:
     name: Run IaC Tools
     runs-on: ubuntu-latest
     permissions:
-      contents: read
+      contents: write
       pull-requests: write
       issues: write
-      pages: write
-      id-token: write
 
     steps:
       # ============================================
@@ -176,10 +174,12 @@ jobs:
             echo "Rover HTML not found; fallback page written."
           fi
 
-      - name: Upload Pages Artifact
-        uses: actions/upload-pages-artifact@v3
+      - name: Deploy to GitHub Pages
+        uses: peaceiris/actions-gh-pages@v4
         with:
-          path: ./pages-output
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          publish_dir: ./pages-output
+          force_orphan: true
 
       # ============================================
       # STEP 7: Summary
@@ -194,21 +194,4 @@ jobs:
           echo "Check the **Artifacts** section to download the Rover diagram!" >> $GITHUB_STEP_SUMMARY
           echo "- 🌐 Live visualization: https://anbazhagan-ramesh.github.io/infra-iac/" >> $GITHUB_STEP_SUMMARY
 
-  # ============================================
-  # JOB 2: Deploy Rover HTML to GitHub Pages
-  # Runs only on pushes to main (not PRs)
-  # ============================================
-  deploy-pages:
-    name: Deploy Rover to GitHub Pages
-    needs: iac-checks
-    runs-on: ubuntu-latest
-    permissions:
-      pages: write
-      id-token: write
-    environment:
-      name: github-pages
-      url: ${{ steps.deployment.outputs.page_url }}
-    steps:
-      - name: Deploy to GitHub Pages
-        id: deployment
-        uses: actions/deploy-pages@v4
+
