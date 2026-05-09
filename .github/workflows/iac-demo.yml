@@ -127,19 +127,17 @@ jobs:
             -planJSONPath=tfplan.json \
             -standalone=true
 
-          # Rover produces rover.zip — extract the HTML from it
+          # Rover produces rover.zip — extract all assets from it
           unzip -o rover.zip -d rover-out
-          # The standalone HTML is the index in the zip
-          cp rover-out/rover.html rover.html 2>/dev/null || \
-          cp rover-out/index.html rover.html 2>/dev/null || \
-          cp "$(find rover-out -name '*.html' | head -1)" rover.html
-          echo "rover.html ready: $(ls -lh rover.html)"
+          echo "=== rover.zip contents ==="
+          ls -la rover-out/
+          echo "rover assets extracted successfully"
 
       - name: Upload Rover Visualization
         uses: actions/upload-artifact@v4
         with:
           name: rover-visualization
-          path: terraform/rover.html
+          path: terraform/rover-out/
           if-no-files-found: warn
 
       - name: Upload Terraform Plan
@@ -155,16 +153,10 @@ jobs:
       # ============================================
       - name: Prepare Pages Directory
         run: |
-          mkdir -p ./pages-output
-          if [ -f terraform/rover.html ]; then
-            cp terraform/rover.html ./pages-output/index.html
-            # also copy graph.svg if fallback was used
-            [ -f terraform/graph.svg ] && cp terraform/graph.svg ./pages-output/graph.svg
-            echo "Rover visualization copied to pages."
-          else
-            echo "ERROR: terraform/rover.html still not found after generation step"
-            ls -la terraform/
-          fi
+          # Copy entire rover-out directory (HTML + all JS/CSS assets)
+          cp -r terraform/rover-out ./pages-output
+          echo "=== Pages content ==="
+          ls -la ./pages-output/
 
       - name: Deploy to GitHub Pages
         uses: peaceiris/actions-gh-pages@v4
