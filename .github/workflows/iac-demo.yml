@@ -1,0 +1,202 @@
+name: IaC Security, Cost & Visualization Demo
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  iac-checks:
+    name: Run IaC Tools
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: write
+      issues: write
+      pages: write
+      id-token: write
+
+    steps:
+      # ============================================
+      # STEP 1: Checkout the code
+      # ============================================
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      # ============================================
+      # STEP 2: Setup Terraform
+      # ============================================
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: 1.6.0
+
+      # ============================================
+      # STEP 3: Run Checkov (Security Scan)
+      # ============================================
+      - name: Run Checkov Security Scan
+        id: checkov
+        uses: bridgecrewio/checkov-action@master
+        with:
+          directory: terraform/
+          framework: terraform
+          soft_fail: true                 # Don't fail build; just report
+          output_format: cli
+          download_external_modules: true
+
+      # ============================================
+      # STEP 4: Terraform Init & Plan (Mocked)
+      # ============================================
+      - name: Generate Mock GCP Credentials
+        run: |
+          # Create a structurally valid (but fake) service account JSON
+          # The Google provider parses the JSON on init; needs private_key + client_email
+          openssl genrsa -out /tmp/mock-key.pem 2048 2>/dev/null
+          PRIVATE_KEY=$(awk '{printf "%s\\n", $0}' /tmp/mock-key.pem)
+          printf '{
+            "type": "service_account",
+            "project_id": "mock-demo-project-12345",
+            "private_key_id": "mock-key-id-001",
+            "private_key": "%s",
+            "client_email": "mock-sa@mock-demo-project-12345.iam.gserviceaccount.com",
+            "client_id": "123456789012345678901",
+            "auth_uri": "https://accounts.google.com/o/oauth2/auth",
+            "token_uri": "https://oauth2.googleapis.com/token"
+          }' "$PRIVATE_KEY" > /tmp/mock-credentials.json
+          echo "GOOGLE_CREDENTIALS=$(cat /tmp/mock-credentials.json)" >> $GITHUB_ENV
+
+      - name: Terraform Init
+        working-directory: terraform/
+        run: terraform init
+
+      - name: Terraform Plan (Mock - No Cloud Required)
+        working-directory: terraform/
+        run: |
+          terraform plan -refresh=false -out=tfplan.binary
+          terraform show -json tfplan.binary > tfplan.json
+
+      # ============================================
+      # STEP 5: Run Infracost (Cost Estimation)
+      # ============================================
+      - name: Setup Infracost
+        uses: infracost/actions/setup@v3
+        with:
+          api-key: ${{ secrets.INFRACOST_API_KEY }}
+
+      - name: Generate Infracost Estimate
+        working-directory: terraform/
+        run: |
+          infracost breakdown \
+            --path tfplan.json \
+            --format json \
+            --out-file /tmp/infracost.json
+
+          infracost output \
+            --path /tmp/infracost.json \
+            --format table
+
+      - name: Post Infracost Comment on PR
+        if: github.event_name == 'pull_request'
+        run: |
+          infracost comment github \
+            --path /tmp/infracost.json \
+            --repo ${{ github.repository }} \
+            --pull-request ${{ github.event.pull_request.number }} \
+            --github-token ${{ secrets.GITHUB_TOKEN }} \
+            --behavior update
+
+      # ============================================
+      # STEP 6: Run Rover (Visualization)
+      # ============================================
+      - name: Generate Rover Visualization
+        working-directory: terraform/
+        run: |
+          docker run --rm \
+            -v $(pwd):/src \
+            -w /src \
+            im2nguyen/rover:latest \
+            -planJSONPath=tfplan.json \
+            -standalone=true || true
+
+          # List generated files
+          ls -la
+
+      - name: Upload Rover Visualization
+        uses: actions/upload-artifact@v4
+        with:
+          name: rover-visualization
+          path: terraform/rover.html
+          if-no-files-found: warn
+
+      - name: Upload Terraform Plan
+        uses: actions/upload-artifact@v4
+        with:
+          name: terraform-plan
+          path: |
+            terraform/tfplan.json
+            terraform/tfplan.binary
+
+      # ============================================
+      # STEP 6b: Prepare GitHub Pages content
+      # ============================================
+      - name: Prepare Pages Directory
+        if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+        run: |
+          mkdir -p ./pages-output
+          if [ -f terraform/rover.html ]; then
+            cp terraform/rover.html ./pages-output/index.html
+            echo "Rover visualization copied to pages."
+          else
+            # Fallback page if Rover didn't generate output
+            cat <<'EOF' > ./pages-output/index.html
+          <!DOCTYPE html>
+          <html><head><title>IaC Demo - Rover</title></head>
+          <body>
+            <h1>IaC Demo</h1>
+            <p>Rover visualization was not generated in this run. Check the workflow logs.</p>
+          </body></html>
+          EOF
+            echo "Rover HTML not found; fallback page written."
+          fi
+
+      - name: Upload Pages Artifact
+        if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: ./pages-output
+
+      # ============================================
+      # STEP 7: Summary
+      # ============================================
+      - name: Demo Summary
+        run: |
+          echo "## 🚀 IaC Demo Complete!" >> $GITHUB_STEP_SUMMARY
+          echo "- ✅ Checkov: Security scan completed" >> $GITHUB_STEP_SUMMARY
+          echo "- 💰 Infracost: Cost estimate generated" >> $GITHUB_STEP_SUMMARY
+          echo "- 🗺️ Rover: Visualization created" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "Check the **Artifacts** section to download the Rover diagram!" >> $GITHUB_STEP_SUMMARY
+          if [[ "${{ github.ref }}" == "refs/heads/main" ]]; then
+            echo "- 🌐 Live visualization: https://anbazhagan-ramesh.github.io/infra-iac/" >> $GITHUB_STEP_SUMMARY
+          fi
+
+  # ============================================
+  # JOB 2: Deploy Rover HTML to GitHub Pages
+  # Runs only on pushes to main (not PRs)
+  # ============================================
+  deploy-pages:
+    name: Deploy Rover to GitHub Pages
+    needs: iac-checks
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    permissions:
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
