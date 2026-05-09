@@ -120,22 +120,23 @@ jobs:
       - name: Generate Rover Visualization
         working-directory: terraform/
         run: |
+          echo "=== Pulling Rover image ==="
+          docker pull im2nguyen/rover:latest
+
+          echo "=== tfplan.json size ==="
+          ls -lh tfplan.json
+
           echo "=== Running Rover ==="
           docker run --rm \
-            -v $(pwd):/src \
+            -v "$(pwd):/src" \
             -w /src \
             im2nguyen/rover:latest \
             -planJSONPath=tfplan.json \
-            -standalone=true \
-            -name=rover || echo "Rover exited with error (non-fatal)"
+            -standalone=true
 
-          echo "=== Files after Rover ==="
+          echo "=== Files generated ==="
           ls -la
-          # Rover outputs rover.html in the working dir; check both possible names
-          if [ ! -f rover.html ] && [ -f rover/index.html ]; then
-            cp rover/index.html rover.html
-          fi
-          ls -la rover.html 2>/dev/null || echo "rover.html not found"
+          ls -lh rover.html
 
       - name: Upload Rover Visualization
         uses: actions/upload-artifact@v4
@@ -160,18 +161,12 @@ jobs:
           mkdir -p ./pages-output
           if [ -f terraform/rover.html ]; then
             cp terraform/rover.html ./pages-output/index.html
+            # also copy graph.svg if fallback was used
+            [ -f terraform/graph.svg ] && cp terraform/graph.svg ./pages-output/graph.svg
             echo "Rover visualization copied to pages."
           else
-            # Fallback page if Rover didn't generate output
-            cat <<'EOF' > ./pages-output/index.html
-          <!DOCTYPE html>
-          <html><head><title>IaC Demo - Rover</title></head>
-          <body>
-            <h1>IaC Demo</h1>
-            <p>Rover visualization was not generated in this run. Check the workflow logs.</p>
-          </body></html>
-          EOF
-            echo "Rover HTML not found; fallback page written."
+            echo "ERROR: terraform/rover.html still not found after generation step"
+            ls -la terraform/
           fi
 
       - name: Deploy to GitHub Pages
