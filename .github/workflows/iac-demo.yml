@@ -91,6 +91,7 @@ jobs:
           api-key: ${{ secrets.INFRACOST_API_KEY }}
 
       - name: Generate Infracost Estimate
+        continue-on-error: true
         working-directory: terraform/
         run: |
           infracost breakdown \
@@ -104,6 +105,7 @@ jobs:
 
       - name: Post Infracost Comment on PR
         if: github.event_name == 'pull_request'
+        continue-on-error: true
         run: |
           infracost comment github \
             --path /tmp/infracost.json \
