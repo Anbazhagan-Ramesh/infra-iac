@@ -38,6 +38,8 @@ jobs:
       - name: Run Checkov Security Scan
         id: checkov
         uses: bridgecrewio/checkov-action@master
+        env:
+          CHECKOV_RESULTS: ""   # prevent env var from polluting subsequent step logs
         with:
           directory: terraform/
           framework: terraform
@@ -120,15 +122,22 @@ jobs:
       - name: Generate Rover Visualization
         working-directory: terraform/
         run: |
+          echo "=== Running Rover ==="
           docker run --rm \
             -v $(pwd):/src \
             -w /src \
             im2nguyen/rover:latest \
             -planJSONPath=tfplan.json \
-            -standalone=true || true
+            -standalone=true \
+            -name=rover || echo "Rover exited with error (non-fatal)"
 
-          # List generated files
+          echo "=== Files after Rover ==="
           ls -la
+          # Rover outputs rover.html in the working dir; check both possible names
+          if [ ! -f rover.html ] && [ -f rover/index.html ]; then
+            cp rover/index.html rover.html
+          fi
+          ls -la rover.html 2>/dev/null || echo "rover.html not found"
 
       - name: Upload Rover Visualization
         uses: actions/upload-artifact@v4
@@ -149,7 +158,6 @@ jobs:
       # STEP 6b: Prepare GitHub Pages content
       # ============================================
       - name: Prepare Pages Directory
-        if: github.ref == 'refs/heads/main' && github.event_name == 'push'
         run: |
           mkdir -p ./pages-output
           if [ -f terraform/rover.html ]; then
@@ -169,7 +177,6 @@ jobs:
           fi
 
       - name: Upload Pages Artifact
-        if: github.ref == 'refs/heads/main' && github.event_name == 'push'
         uses: actions/upload-pages-artifact@v3
         with:
           path: ./pages-output
@@ -185,9 +192,7 @@ jobs:
           echo "- 🗺️ Rover: Visualization created" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "Check the **Artifacts** section to download the Rover diagram!" >> $GITHUB_STEP_SUMMARY
-          if [[ "${{ github.ref }}" == "refs/heads/main" ]]; then
-            echo "- 🌐 Live visualization: https://anbazhagan-ramesh.github.io/infra-iac/" >> $GITHUB_STEP_SUMMARY
-          fi
+          echo "- 🌐 Live visualization: https://anbazhagan-ramesh.github.io/infra-iac/" >> $GITHUB_STEP_SUMMARY
 
   # ============================================
   # JOB 2: Deploy Rover HTML to GitHub Pages
@@ -197,7 +202,6 @@ jobs:
     name: Deploy Rover to GitHub Pages
     needs: iac-checks
     runs-on: ubuntu-latest
-    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
     permissions:
       pages: write
       id-token: write
