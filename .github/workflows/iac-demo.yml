@@ -120,13 +120,6 @@ jobs:
       - name: Generate Rover Visualization
         working-directory: terraform/
         run: |
-          echo "=== Pulling Rover image ==="
-          docker pull im2nguyen/rover:latest
-
-          echo "=== tfplan.json size ==="
-          ls -lh tfplan.json
-
-          echo "=== Running Rover ==="
           docker run --rm \
             -v "$(pwd):/src" \
             -w /src \
@@ -134,9 +127,13 @@ jobs:
             -planJSONPath=tfplan.json \
             -standalone=true
 
-          echo "=== Files generated ==="
-          ls -la
-          ls -lh rover.html
+          # Rover produces rover.zip — extract the HTML from it
+          unzip -o rover.zip -d rover-out
+          # The standalone HTML is the index in the zip
+          cp rover-out/rover.html rover.html 2>/dev/null || \
+          cp rover-out/index.html rover.html 2>/dev/null || \
+          cp "$(find rover-out -name '*.html' | head -1)" rover.html
+          echo "rover.html ready: $(ls -lh rover.html)"
 
       - name: Upload Rover Visualization
         uses: actions/upload-artifact@v4
