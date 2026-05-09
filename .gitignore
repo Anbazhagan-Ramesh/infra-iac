@@ -1,0 +1,22 @@
+# Terraform
+**/.terraform/*
+*.tfstate
+*.tfstate.*
+*.tfplan
+*.tfplan.*
+tfplan.binary
+tfplan.json
+crash.log
+*.tfvars
+!example.tfvars
+.terraform.lock.hcl
+
+# Rover
+rover.svg
+rover.png
+
+# IDE
+.vscode/
+.idea/
+*.swp
+.DS_Store
