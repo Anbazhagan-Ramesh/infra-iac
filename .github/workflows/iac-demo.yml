@@ -1,0 +1,181 @@
+name: IaC Security, Cost & Visualization Demo
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  iac-checks:
+    name: Run IaC Tools
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pull-requests: write
+      issues: write
+
+    steps:
+      # ============================================
+      # STEP 1: Checkout the code
+      # ============================================
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      # ============================================
+      # STEP 2: Setup Terraform
+      # ============================================
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: 1.10.0
+
+      # ============================================
+      # STEP 3: Run Checkov (Security Scan)
+      # ============================================
+      - name: Run Checkov Security Scan
+        id: checkov
+        uses: bridgecrewio/checkov-action@master
+        env:
+          CHECKOV_RESULTS: ""   # prevent env var from polluting subsequent step logs
+        with:
+          directory: terraform/
+          framework: terraform
+          soft_fail: true                 # Don't fail build; just report
+          output_format: cli
+          download_external_modules: true
+
+      # ============================================
+      # STEP 4: Terraform Init & Plan (Mocked)
+      # ============================================
+      - name: Generate Mock GCP Credentials
+        run: |
+          # Create a structurally valid (but fake) service account JSON
+          # The Google provider parses the JSON on init; needs private_key + client_email
+          openssl genrsa -out /tmp/mock-key.pem 2048 2>/dev/null
+          PRIVATE_KEY=$(awk '{printf "%s\\n", $0}' /tmp/mock-key.pem)
+          printf '{
+            "type": "service_account",
+            "project_id": "mock-demo-project-12345",
+            "private_key_id": "mock-key-id-001",
+            "private_key": "%s",
+            "client_email": "mock-sa@mock-demo-project-12345.iam.gserviceaccount.com",
+            "client_id": "123456789012345678901",
+            "auth_uri": "https://accounts.google.com/o/oauth2/auth",
+            "token_uri": "https://oauth2.googleapis.com/token"
+          }' "$PRIVATE_KEY" > /tmp/mock-credentials.json
+          printf '\n' >> /tmp/mock-credentials.json  # ensure trailing newline for heredoc delimiter
+          # Multi-line values must use heredoc delimiter format in GITHUB_ENV
+          {
+            echo "GOOGLE_CREDENTIALS<<GCPCREDS_EOF"
+            cat /tmp/mock-credentials.json
+            echo "GCPCREDS_EOF"
+          } >> "$GITHUB_ENV"
+
+      - name: Terraform Init
+        working-directory: terraform/
+        run: terraform init
+
+      - name: Terraform Plan (Mock - No Cloud Required)
+        working-directory: terraform/
+        run: |
+          terraform plan -refresh=false -out=tfplan.binary
+          terraform show -json tfplan.binary > tfplan.json
+
+      # ============================================
+      # STEP 5: Run Infracost (Cost Estimation)
+      # ============================================
+      - name: Setup Infracost
+        uses: infracost/actions/setup@v3
+        with:
+          api-key: ${{ secrets.INFRACOST_API_KEY }}
+
+      - name: Generate Infracost Estimate
+        continue-on-error: true
+        working-directory: terraform/
+        run: |
+          infracost breakdown \
+            --path tfplan.json \
+            --format json \
+            --out-file /tmp/infracost.json
+
+          infracost output \
+            --path /tmp/infracost.json \
+            --format table
+
+      - name: Post Infracost Comment on PR
+        if: github.event_name == 'pull_request'
+        continue-on-error: true
+        run: |
+          infracost comment github \
+            --path /tmp/infracost.json \
+            --repo ${{ github.repository }} \
+            --pull-request ${{ github.event.pull_request.number }} \
+            --github-token ${{ secrets.GITHUB_TOKEN }} \
+            --behavior update
+
+      # ============================================
+      # STEP 6: Run Rover (Visualization)
+      # ============================================
+      - name: Generate Rover Visualization
+        working-directory: terraform/
+        run: |
+          docker run --rm \
+            -v "$(pwd):/src" \
+            -w /src \
+            im2nguyen/rover:latest \
+            -planJSONPath=tfplan.json \
+            -standalone=true
+
+          # Rover produces rover.zip — extract all assets from it
+          unzip -o rover.zip -d rover-out
+          echo "=== rover.zip contents ==="
+          ls -la rover-out/
+          echo "rover assets extracted successfully"
+
+      - name: Upload Rover Visualization
+        uses: actions/upload-artifact@v4
+        with:
+          name: rover-visualization
+          path: terraform/rover-out/
+          if-no-files-found: warn
+
+      - name: Upload Terraform Plan
+        uses: actions/upload-artifact@v4
+        with:
+          name: terraform-plan
+          path: |
+            terraform/tfplan.json
+            terraform/tfplan.binary
+
+      # ============================================
+      # STEP 6b: Prepare GitHub Pages content
+      # ============================================
+      - name: Prepare Pages Directory
+        run: |
+          # Copy entire rover-out directory (HTML + all JS/CSS assets)
+          cp -r terraform/rover-out ./pages-output
+          echo "=== Pages content ==="
+          ls -la ./pages-output/
+
+      - name: Deploy to GitHub Pages
+        uses: peaceiris/actions-gh-pages@v4
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          publish_dir: ./pages-output
+          force_orphan: true
+
+      # ============================================
+      # STEP 7: Summary
+      # ============================================
+      - name: Demo Summary
+        run: |
+          echo "## 🚀 IaC Demo Complete!" >> $GITHUB_STEP_SUMMARY
+          echo "- ✅ Checkov: Security scan completed" >> $GITHUB_STEP_SUMMARY
+          echo "- 💰 Infracost: Cost estimate generated" >> $GITHUB_STEP_SUMMARY
+          echo "- 🗺️ Rover: Visualization created" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "Check the **Artifacts** section to download the Rover diagram!" >> $GITHUB_STEP_SUMMARY
+          echo "- 🌐 Live visualization: https://anbazhagan-ramesh.github.io/infra-iac/" >> $GITHUB_STEP_SUMMARY
+
+
