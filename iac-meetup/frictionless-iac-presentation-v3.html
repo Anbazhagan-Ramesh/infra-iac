@@ -1,0 +1,1127 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Frictionless Infrastructure: Transforming the IaC Experience</title>
+<style>
+  :root {
+    --bg-dark: #0d1117;
+    --bg-card: #161b22;
+    --bg-card2: #1c2128;
+    --accent-blue: #58a6ff;
+    --accent-green: #3fb950;
+    --accent-orange: #f0883e;
+    --accent-purple: #bc8cff;
+    --accent-red: #ff7b72;
+    --accent-cyan: #39d3f7;
+    --text-primary: #e6edf3;
+    --text-secondary: #8b949e;
+    --border: #30363d;
+    --slide-width: 1200px;
+    --slide-height: 675px;
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    background: #010409;
+    font-family: -apple-system, 'Segoe UI', sans-serif;
+    color: var(--text-primary);
+    overflow: hidden;
+    height: 100vh;
+  }
+
+  /* ── NAV ── */
+  .nav {
+    position: fixed; top: 0; left: 0; right: 0; height: 52px;
+    background: rgba(13,17,23,0.95);
+    border-bottom: 1px solid var(--border);
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 0 24px; z-index: 100; backdrop-filter: blur(8px);
+  }
+  .nav-title { font-size: 13px; font-weight: 600; color: var(--text-secondary); }
+  .nav-controls { display: flex; gap: 10px; align-items: center; }
+  .nav-btn {
+    background: var(--bg-card); border: 1px solid var(--border);
+    color: var(--text-primary); padding: 6px 16px; border-radius: 6px;
+    cursor: pointer; font-size: 13px; transition: all 0.15s;
+  }
+  .nav-btn:hover { background: var(--bg-card2); border-color: var(--accent-blue); }
+  .slide-counter { font-size: 13px; color: var(--text-secondary); min-width: 70px; text-align: center; }
+
+  /* ── GPEN LOGO ── */
+  #gpen-logo {
+    position: fixed; top: 62px; right: calc(50% - 600px + 16px);
+    z-index: 200; width: 52px; height: 52px; border-radius: 50%; overflow: hidden;
+    pointer-events: none; box-shadow: 0 0 0 2px rgba(88,166,255,0.25);
+  }
+  #gpen-logo img { width: 100%; height: 100%; object-fit: cover; display: block; }
+
+  /* ── SLIDES ── */
+  .slides-container { position: fixed; top: 52px; left: 0; right: 0; bottom: 40px; display: flex; align-items: center; justify-content: center; }
+
+  .slide {
+    width: var(--slide-width);
+    height: var(--slide-height);
+    background: var(--bg-dark);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    position: relative; overflow: hidden; display: none;
+    padding: 32px 48px; flex-direction: column; justify-content: flex-start;
+  }
+  .slide.active { display: flex; }
+
+  .slide-num {
+    position: absolute; bottom: 20px; right: 24px;
+    font-size: 11px; color: var(--text-secondary); font-weight: 500;
+  }
+
+  /* top colour bar */
+  .slide::before { content: ''; position: absolute; top: 0; left: 0; right: 0; height: 3px; }
+  .slide-1::before  { background: linear-gradient(90deg, #58a6ff, #bc8cff, #3fb950); }
+  .slide-2::before  { background: linear-gradient(90deg, #58a6ff, #39d3f7); }
+  .slide-3::before  { background: linear-gradient(90deg, #ff7b72, #f0883e); }
+  .slide-4::before  { background: linear-gradient(90deg, #3fb950, #39d3f7); }
+  .slide-5::before  { background: linear-gradient(90deg, #f0883e, #ff7b72); }
+  .slide-6::before  { background: linear-gradient(90deg, #39d3f7, #58a6ff); }
+  .slide-7::before  { background: linear-gradient(90deg, #3fb950, #58a6ff); }
+  .slide-8::before  { background: linear-gradient(90deg, #bc8cff, #f0883e); }
+  .slide-9::before  { background: linear-gradient(90deg, #ff7b72, #bc8cff); }
+  .slide-10::before { background: linear-gradient(90deg, #3fb950, #58a6ff); }
+  .slide-11::before { background: linear-gradient(90deg, #bc8cff, #f0883e); }
+  .slide-12::before { background: linear-gradient(90deg, #ff7b72, #bc8cff); }
+  .slide-13::before { background: linear-gradient(90deg, #58a6ff, #bc8cff, #3fb950); }
+
+  /* bg circles */
+  .bg-circle { position: absolute; border-radius: 50%; opacity: 0.04; pointer-events: none; }
+
+  /* ── TYPOGRAPHY ── */
+  .eyebrow { font-size: 11px; font-weight: 700; letter-spacing: 2px; text-transform: uppercase; color: var(--accent-blue); margin-bottom: 6px; }
+  h1 { font-size: 52px; font-weight: 800; line-height: 1.1; }
+  h2 { font-size: 27px; font-weight: 700; line-height: 1.2; }
+  h3 { font-size: 20px; font-weight: 700; }
+  h4 { font-size: 14px; font-weight: 700; margin-bottom: 5px; }
+  p, li { font-size: 13px; line-height: 1.5; color: var(--text-secondary); }
+  p.lead { font-size: 17px; color: var(--text-primary); opacity: 0.85; }
+  ul { padding-left: 16px; }
+  li { margin-bottom: 2px; }
+
+  /* ── LAYOUT ── */
+  .two-col   { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; }
+  .three-col { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 12px; }
+  .four-col  { display: grid; grid-template-columns: 1fr 1fr 1fr 1fr; gap: 14px; }
+  .mt-8  { margin-top: 4px; }
+  .mt-14 { margin-top: 8px; }
+  .mt-20 { margin-top: 12px; }
+  .mt-28 { margin-top: 16px; }
+
+  /* ── CARDS ── */
+  .card {
+    background: var(--bg-card); border: 1px solid var(--border);
+    border-radius: 10px; padding: 11px 14px;
+  }
+  .card.green  { border-color: rgba(63,185,80,0.4);  background: rgba(63,185,80,0.06); }
+  .card.blue   { border-color: rgba(88,166,255,0.4); background: rgba(88,166,255,0.06); }
+  .card.orange { border-color: rgba(240,136,62,0.4); background: rgba(240,136,62,0.06); }
+  .card.purple { border-color: rgba(188,140,255,0.4);background: rgba(188,140,255,0.06); }
+  .card.red    { border-color: rgba(255,123,114,0.4); background: rgba(255,123,114,0.06); }
+  .card.cyan   { border-color: rgba(57,211,247,0.4);  background: rgba(57,211,247,0.06); }
+
+  /* ── BADGES / PILLS ── */
+  .tool-badge { display: inline-flex; align-items: center; gap: 8px; padding: 5px 13px; border-radius: 20px; font-size: 13px; font-weight: 700; margin-right: 8px; }
+  .badge-checkov  { background: rgba(240,136,62,0.15); border: 1px solid rgba(240,136,62,0.5); color: #f0883e; }
+  .badge-rover    { background: rgba(88,166,255,0.15); border: 1px solid rgba(88,166,255,0.5); color: #58a6ff; }
+  .badge-infracost{ background: rgba(63,185,80,0.15);  border: 1px solid rgba(63,185,80,0.5); color: #3fb950; }
+
+  .pill { display: inline-block; padding: 2px 9px; border-radius: 12px; font-size: 11px; font-weight: 600; margin: 2px 2px; }
+  .pill-blue   { background: rgba(88,166,255,0.15);  color: #58a6ff; }
+  .pill-green  { background: rgba(63,185,80,0.15);   color: #3fb950; }
+  .pill-orange { background: rgba(240,136,62,0.15);  color: #f0883e; }
+  .pill-purple { background: rgba(188,140,255,0.15); color: #bc8cff; }
+  .pill-red    { background: rgba(255,123,114,0.15); color: #ff7b72; }
+  .pill-cyan   { background: rgba(57,211,247,0.15);  color: #39d3f7; }
+
+  /* ── TABLES ── */
+  table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  th { text-align: left; padding: 8px 12px; background: var(--bg-card2); color: var(--text-secondary); font-size: 10px; letter-spacing: 1px; text-transform: uppercase; border-bottom: 1px solid var(--border); }
+  td { padding: 8px 12px; border-bottom: 1px solid rgba(48,54,61,0.5); color: var(--text-secondary); vertical-align: middle; }
+  tr:last-child td { border-bottom: none; }
+  td:first-child { color: var(--text-primary); font-weight: 700; }
+
+  /* ── FLOW ── */
+  .flow { display: flex; align-items: stretch; }
+  .flow-step { flex: 1; background: var(--bg-card); border: 1px solid var(--border); border-radius: 10px; padding: 9px; text-align: center; }
+  .flow-arrow { display: flex; align-items: center; color: var(--text-secondary); font-size: 18px; padding: 0 5px; }
+  .flow-icon { font-size: 24px; margin-bottom: 6px; }
+  .flow-step h4 { font-size: 12px; color: var(--text-primary); }
+  .flow-step p  { font-size: 11px; margin-top: 3px; }
+
+  /* ── CHECKLIST ── */
+  .check-list { list-style: none; padding: 0; }
+  .check-list li { padding: 2px 0; padding-left: 18px; position: relative; color: var(--text-secondary); font-size: 12px; }
+  .check-list li::before { content: '✓'; position: absolute; left: 0; color: var(--accent-green); font-weight: 700; }
+
+  /* ── STAT ── */
+  .stat-box { text-align: center; padding: 16px 10px; }
+  .stat-num { font-size: 36px; font-weight: 800; line-height: 1; }
+  .stat-label { font-size: 12px; color: var(--text-secondary); margin-top: 5px; }
+
+  /* ── QUOTE ── */
+  .quote { border-left: 3px solid var(--accent-blue); padding: 8px 14px; background: var(--bg-card); border-radius: 0 8px 8px 0; font-style: italic; color: var(--text-primary); font-size: 13px; line-height: 1.45; }
+
+  /* ── AGENDA ── */
+  .agenda-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 7px; margin-top: 10px; }
+  .agenda-item { display: flex; gap: 10px; align-items: center; background: var(--bg-card); border: 1px solid var(--border); border-radius: 8px; padding: 7px 12px; }
+  .agenda-num  { font-size: 17px; font-weight: 800; color: var(--accent-blue); min-width: 24px; }
+  .agenda-item h4 { font-size: 13px; color: var(--text-primary); }
+  .agenda-item p  { font-size: 11px; margin: 0; }
+
+  /* ── TITLE CARD ── */
+  .title-tag { display: inline-flex; align-items: center; gap: 6px; background: rgba(88,166,255,0.1); border: 1px solid rgba(88,166,255,0.3); border-radius: 20px; padding: 5px 14px; font-size: 12px; color: var(--accent-blue); font-weight: 600; margin-bottom: 22px; }
+  .gradient-text { background: linear-gradient(135deg, #58a6ff 0%, #bc8cff 50%, #3fb950 100%); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; }
+
+  /* ── SCORE BARS ── */
+  .score-bar-wrap { display: flex; align-items: center; gap: 7px; }
+  .score-bar { height: 7px; border-radius: 4px; background: rgba(88,166,255,0.12); flex: 1; overflow: hidden; }
+  .score-bar-fill { height: 100%; border-radius: 4px; }
+  .score-val { font-size: 12px; font-weight: 700; min-width: 30px; text-align: right; }
+
+  /* ── SEC CARD ── */
+  .sec-card { background: var(--bg-card); border: 1px solid var(--border); border-radius: 8px; padding: 7px 11px; }
+  .sec-card h5 { font-size: 12px; font-weight: 700; color: var(--text-primary); margin-bottom: 5px; }
+  .sec-card p  { font-size: 12px; color: var(--text-secondary); margin: 0; line-height: 1.5; }
+
+  /* ── REVEAL ANIMATION ── */
+  /* Items hidden by default — take ZERO height so slide never grows past --slide-height */
+  .reveal-item {
+    display: none;
+  }
+  .reveal-item.revealed {
+    display: block;
+    animation: revealIn 0.38s ease both;
+  }
+  @keyframes revealIn {
+    from { opacity: 0; transform: translateY(12px); }
+    to   { opacity: 1; transform: translateY(0); }
+  }
+  /* Grid-cell variant: items sit in a CSS grid so we can't use display:none
+     (it would collapse the grid column). Use opacity instead — total content
+     fits within --slide-height so this doesn't cause scroll. */
+  .reveal-grid-item {
+    opacity: 0;
+    transform: translateY(10px);
+    transition: opacity 0.38s ease, transform 0.38s ease;
+    pointer-events: none;
+  }
+  .reveal-grid-item.revealed {
+    opacity: 1;
+    transform: translateY(0);
+    pointer-events: auto;
+  }
+
+  /* ── STEP HINT ── */
+  .step-hint {
+    position: absolute; bottom: 20px; left: 50%; transform: translateX(-50%);
+    font-size: 11px; color: var(--text-secondary);
+    display: flex; align-items: center; gap: 5px;
+    opacity: 0.65; transition: opacity 0.3s; white-space: nowrap;
+  }
+  .step-hint.done { opacity: 0; pointer-events: none; }
+  .step-hint-arrow { display: inline-block; animation: blink-arr 1s infinite; color: var(--accent-blue); }
+  @keyframes blink-arr { 0%,100%{transform:translateX(0)} 50%{transform:translateX(4px)} }
+
+  /* ── PROGRESS DOTS ── */
+  .progress-bar { position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%); display: flex; gap: 6px; z-index: 100; }
+  .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--border); cursor: pointer; transition: all 0.2s; }
+  .dot.active { background: var(--accent-blue); transform: scale(1.3); }
+
+  /* ── SLIDE-1 size bump (spare vertical space) ── */
+  .slide-1 p.lead { font-size: 20px; line-height: 1.6; }
+  .slide-1 .tool-badge { font-size: 14px; padding: 7px 18px; }
+
+  /* ── SLIDE-2 size bump (agenda has lots of room) ── */
+  .slide-2 h2 { font-size: 34px; }
+  .slide-2 .agenda-grid { gap: 12px; margin-top: 20px; }
+  .slide-2 .agenda-item { padding: 12px 16px; gap: 14px; }
+  .slide-2 .agenda-num { font-size: 20px; min-width: 28px; }
+  .slide-2 .agenda-item h4 { font-size: 14px; }
+  .slide-2 .agenda-item p { font-size: 12px; }
+</style>
+</head>
+<body>
+
+<!-- GPEN Logo fixed on every slide -->
+<div id="gpen-logo">
+  <img src="gpen.png" alt="GPEN" onerror="this.parentElement.style.display='none'">
+</div>
+
+<!-- NAV -->
+<nav class="nav">
+  <span class="nav-title">Frictionless Infrastructure: Transforming the IaC Experience</span>
+  <div class="nav-controls">
+    <button class="nav-btn" onclick="changeSlide(-1)">← Prev</button>
+    <span class="slide-counter" id="counter">1 / 13</span>
+    <button class="nav-btn" onclick="changeSlide(1)">Next →</button>
+  </div>
+</nav>
+
+<div class="slides-container">
+
+  <!-- ══ SLIDE 1 — TITLE ══ -->
+  <section class="slide slide-1 active">
+    <div class="bg-circle" style="width:600px;height:600px;right:-150px;top:-100px;background:#58a6ff;"></div>
+    <div class="bg-circle" style="width:400px;height:400px;left:-80px;bottom:-80px;background:#bc8cff;"></div>
+
+    <div class="title-tag">⚙️ Infrastructure as Code Tooling</div>
+    <h1 class="gradient-text">Frictionless Infrastructure</h1>
+    <h1 style="font-size:43px;color:var(--text-secondary);font-weight:400;margin-top:10px;">Transforming the IaC Experience</h1>
+    <p class="lead" style="max-width:680px;margin-top:20px;">
+      How modern open-source tools — Checkov, Rover, and Infracost — shift security, visibility, and cost governance left into the developer workflow.
+    </p>
+    <div style="display:flex;gap:12px;margin-top:32px;">
+      <span class="tool-badge badge-checkov">🛡 Checkov</span>
+      <span class="tool-badge badge-rover">🗺 Rover</span>
+      <span class="tool-badge badge-infracost">💰 Infracost</span>
+    </div>
+    <div class="slide-num">01 / 13</div>
+  </section>
+
+
+  <!-- ══ SLIDE 2 — AGENDA ══ -->
+  <section class="slide slide-2">
+    <div class="eyebrow">Agenda</div>
+    <h2>What we'll cover today</h2>
+    <div class="reveal-item" id="s2-r0">
+    <div class="agenda-grid">
+      <div class="agenda-item"><div class="agenda-num">01</div><div><h4>The Modern IaC Problem</h4><p>Why teams struggle with unreviewed IaC</p></div></div>
+      <div class="agenda-item"><div class="agenda-num" style="color:var(--accent-orange)">02</div><div><h4>Shift-Left Philosophy</h4><p>Catching issues at code-writing time</p></div></div>
+      <div class="agenda-item"><div class="agenda-num" style="color:var(--accent-orange)">03</div><div><h4>Checkov — Security Scanning</h4><p>750+ policies, misconfig detection, deep dive</p></div></div>
+      <div class="agenda-item"><div class="agenda-num" style="color:var(--accent-blue)">04</div><div><h4>Rover — Visual Plan Explorer</h4><p>Interactive Terraform visualization &amp; benefits</p></div></div>
+      <div class="agenda-item"><div class="agenda-num" style="color:var(--accent-green)">05</div><div><h4>Infracost — Cost Intelligence</h4><p>PR-level spend + paid vs free rationale</p></div></div>
+      <div class="agenda-item"><div class="agenda-num" style="color:var(--accent-purple)">06</div><div><h4>Benchmark Scores</h4><p>Why these tools beat every alternative</p></div></div>
+      <div class="agenda-item"><div class="agenda-num" style="color:var(--accent-red)">07</div><div><h4>Security Deep-Dive</h4><p>Supply chain, privacy &amp; CVE posture</p></div></div>
+      <div class="agenda-item"><div class="agenda-num" style="color:var(--accent-cyan)">08</div><div><h4>Alternative Landscape</h4><p>What else exists &amp; why we didn't choose it</p></div></div>
+      <div class="agenda-item"><div class="agenda-num" style="color:var(--accent-green)">09</div><div><h4>CI/CD Integration</h4><p>End-to-end unified pipeline walkthrough</p></div></div>
+      <div class="agenda-item"><div class="agenda-num" style="color:var(--accent-blue)">10</div><div><h4>Summary &amp; Next Steps</h4><p>Outcomes, metrics &amp; action items</p></div></div>
+    </div>
+    </div>
+    <div class="step-hint" id="s2-hint"><span class="step-hint-arrow">▶</span> Press Next to see the agenda</div>
+    <div class="slide-num">02 / 13</div>
+  </section>
+
+
+  <!-- ══ SLIDE 3 — MODERN IAC PROBLEM + SHIFT-LEFT ══ -->
+  <section class="slide slide-3">
+    <div class="eyebrow">Context &amp; Principle</div>
+    <h2>The Modern IaC Problem &amp; Shift-Left Fix</h2>
+
+    <div class="two-col mt-20">
+      <!-- left: problems -->
+      <div class="reveal-grid-item" id="s3-r0" style="display:flex;flex-direction:column;gap:10px;">
+        <div class="card red" style="display:flex;gap:12px;align-items:flex-start;">
+          <span style="font-size:22px;flex-shrink:0;">🔒</span>
+          <div><h4 style="color:var(--accent-red);">Silent Misconfigurations</h4><p style="font-size:12px;">Open S3 buckets, unencrypted DBs, over-privileged IAM slip through manual review into production.</p></div>
+        </div>
+        <div class="card red" style="display:flex;gap:12px;align-items:flex-start;">
+          <span style="font-size:22px;flex-shrink:0;">💸</span>
+          <div><h4 style="color:var(--accent-red);">Surprise Cloud Bills</h4><p style="font-size:12px;">Changes merged without cost visibility. Teams find expensive resources only on the monthly invoice.</p></div>
+        </div>
+        <div class="card red" style="display:flex;gap:12px;align-items:flex-start;">
+          <span style="font-size:22px;flex-shrink:0;">🗂</span>
+          <div><h4 style="color:var(--accent-red);">Invisible Resource Graph</h4><p style="font-size:12px;">Complex module trees make it impossible to understand what <code>terraform plan</code> will actually do.</p></div>
+        </div>
+        <div class="card red" style="display:flex;gap:12px;align-items:flex-start;">
+          <span style="font-size:22px;flex-shrink:0;">📋</span>
+          <div><h4 style="color:var(--accent-red);">Compliance Debt</h4><p style="font-size:12px;">CIS &amp; FinOps policies enforced only by manual audits — creating sprawling compliance debt.</p></div>
+        </div>
+      </div>
+      <!-- right: fix -->
+      <div class="reveal-grid-item" id="s3-r1">
+        <div class="quote" style="margin-bottom:14px;">"The cost of fixing a bug multiplies the later it's discovered. The same is true for misconfiguration, compliance violations, and runaway spend."</div>
+        <div class="flow mt-14">
+          <div class="flow-step" style="border-color:rgba(88,166,255,0.4);background:rgba(88,166,255,0.06)">
+            <div class="flow-icon">✍️</div><h4>Write Code</h4><p>IDE inline cost &amp; lint</p>
+          </div>
+          <div class="flow-arrow">→</div>
+          <div class="flow-step" style="border-color:rgba(240,136,62,0.4);background:rgba(240,136,62,0.06)">
+            <div class="flow-icon">🛡</div><h4>Pull Request</h4><p>Checkov + Rover + Infracost</p>
+          </div>
+          <div class="flow-arrow">→</div>
+          <div class="flow-step" style="border-color:rgba(188,140,255,0.4);background:rgba(188,140,255,0.06)">
+            <div class="flow-icon">🤖</div><h4>CI Gate</h4><p>Block on policy failures</p>
+          </div>
+          <div class="flow-arrow">→</div>
+          <div class="flow-step" style="border-color:rgba(63,185,80,0.4);background:rgba(63,185,80,0.06)">
+            <div class="flow-icon">🚀</div><h4>Deploy</h4><p>Compliant &amp; cost-approved</p>
+          </div>
+        </div>
+        <div class="three-col mt-14">
+          <div class="card blue" style="padding:12px;"><h4 style="color:var(--accent-blue);font-size:12px;">Security</h4><p style="font-size:11px;">Misconfig blocked at PR, not post-breach.</p></div>
+          <div class="card orange" style="padding:12px;"><h4 style="color:var(--accent-orange);font-size:12px;">Visibility</h4><p style="font-size:11px;">Full resource graph in every PR.</p></div>
+          <div class="card green" style="padding:12px;"><h4 style="color:var(--accent-green);font-size:12px;">Cost</h4><p style="font-size:11px;">Budget impact = part of code review.</p></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="step-hint" id="s3-hint"><span class="step-hint-arrow">▶</span> Press Next to reveal sections</div>
+    <div class="slide-num">03 / 13</div>
+  </section>
+
+
+  <!-- ══ SLIDE 4 — CHECKOV OVERVIEW ══ -->
+  <section class="slide slide-4">
+    <div class="eyebrow">Tool 1 of 3</div>
+    <div style="display:flex;align-items:center;gap:12px;">
+      <span style="font-size:32px;">🛡</span>
+      <div><h2>Checkov</h2><p style="font-size:13px;color:var(--accent-orange);">Static Analysis &amp; Policy Engine for IaC · <strong style="color:var(--text-primary)">Benchmark: 93/100</strong></p></div>
+    </div>
+    <div class="two-col mt-12">
+      <div class="reveal-grid-item" id="s4-r0">
+        <div class="card orange">
+          <h4 style="color:var(--accent-orange);margin-bottom:6px;">What is it?</h4>
+          <p style="font-size:12px;">Open-source static analysis that scans IaC for misconfigurations, security vulnerabilities &amp; compliance violations <em>before</em> deployment — against <strong style="color:var(--text-primary)">750+ built-in policies</strong> aligned to CIS Benchmarks &amp; AWS Foundations.</p>
+          <p style="font-size:11px;color:var(--text-secondary);margin-top:5px;">🔓 Apache 2.0 · Maintained by Prisma Cloud (Palo Alto Networks) · ⭐ 8,800+ GitHub stars · 409 contributors</p>
+          <div style="margin-top:8px;">
+            <span class="pill pill-orange">Terraform</span><span class="pill pill-orange">CloudFormation</span><span class="pill pill-orange">ARM Templates</span><span class="pill pill-orange">Kubernetes</span><span class="pill pill-orange">Helm</span><span class="pill pill-orange">Docker</span><span class="pill pill-orange">AWS SAM</span>
+          </div>
+        </div>
+        <div class="card mt-8">
+          <h4 style="margin-bottom:6px;">🔍 Problems it Solves</h4>
+          <ul style="padding-left:14px;">
+            <li>Open storage buckets shipped to prod</li>
+            <li>Unencrypted databases and volumes</li>
+            <li>Over-permissive IAM roles (<code>*:*</code>)</li>
+            <li>Missing logging / audit trails</li>
+            <li>Non-compliant resource tagging</li>
+          </ul>
+        </div>
+      </div>
+      <div class="reveal-grid-item" id="s4-r1">
+        <h4 style="color:var(--text-primary);margin-bottom:8px;">Key Capabilities</h4>
+        <ul class="check-list">
+          <li>750+ built-in security &amp; compliance policies</li>
+          <li>Custom policies via Python or YAML</li>
+          <li>Graph-based analysis across resource relationships</li>
+          <li>CI/CD: GitHub Actions, GitLab CI, Jenkins, Azure DevOps</li>
+          <li>Output: SARIF, JUnit XML, CycloneDX, JSON</li>
+          <li>SCA scanning: container images &amp; open-source packages (CVEs)</li>
+          <li>Runs fully offline — no IaC code leaves your network</li>
+        </ul>
+        <div class="card mt-8" style="background:rgba(240,136,62,0.05);border-color:rgba(240,136,62,0.3);">
+          <h4 style="color:var(--accent-orange);margin-bottom:5px;">Sample checks enforced automatically</h4>
+          <div style="display:flex;flex-wrap:wrap;gap:3px;">
+            <span class="pill pill-orange">S3 bucket not public</span>
+            <span class="pill pill-red">RDS encryption at rest</span>
+            <span class="pill pill-orange">SG no 0.0.0.0/0 port 22</span>
+            <span class="pill pill-orange">EKS secrets encryption</span>
+            <span class="pill pill-red">No hardcoded secrets</span>
+            <span class="pill pill-orange">CloudTrail logging</span>
+            <span class="pill pill-orange">IMDSv2 on EC2</span>
+            <span class="pill pill-red">No wildcard IAM</span>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="step-hint" id="s4-hint"><span class="step-hint-arrow">▶</span> Press Next to reveal sections</div>
+    <div class="slide-num">04 / 13</div>
+  </section>
+
+
+  <!-- ══ SLIDE 5 — CHECKOV IN PRACTICE ══ -->
+  <section class="slide slide-5">
+    <div class="eyebrow">Checkov · In Practice</div>
+    <h2>Checkov: Integration &amp; Business Value</h2>
+    <div class="two-col mt-12">
+      <div class="reveal-grid-item" id="s5-r0">
+        <div class="card blue">
+          <h4 style="color:var(--accent-blue);">⚡ Integration Points</h4>
+          <ul style="margin-top:6px;padding-left:14px;">
+            <li>Pre-commit hooks (instant local feedback)</li>
+            <li>PR/merge request checks (block or warn)</li>
+            <li>IDE plugins for real-time analysis</li>
+            <li>Slack / Jira notifications on violation</li>
+          </ul>
+        </div>
+        <div class="card green mt-8">
+          <h4 style="color:var(--accent-green);">✅ Business Benefits</h4>
+          <ul style="margin-top:6px;padding-left:14px;">
+            <li>Reduced breach surface area</li>
+            <li>Continuous compliance posture (CIS, SOC2, ISO)</li>
+            <li>Audit-ready SARIF/JUnit reports</li>
+            <li>Faster security certifications</li>
+          </ul>
+        </div>
+      </div>
+      <div class="reveal-grid-item" id="s5-r1">
+        <div class="card orange">
+          <h4 style="color:var(--accent-orange);margin-bottom:6px;">🚦 CI Enforcement Flow</h4>
+          <div style="display:flex;flex-direction:column;gap:6px;margin-top:4px;">
+            <div style="display:flex;align-items:center;gap:10px;"><span style="font-size:18px;">✍️</span><div><h4 style="font-size:12px;">Commit</h4><p style="font-size:11px;margin:0;">checkov pre-commit hook runs instantly</p></div></div>
+            <div style="display:flex;align-items:center;gap:10px;"><span style="font-size:18px;">🔀</span><div><h4 style="font-size:12px;">Pull Request</h4><p style="font-size:11px;margin:0;">SARIF annotations inline in PR diff</p></div></div>
+            <div style="display:flex;align-items:center;gap:10px;"><span style="font-size:18px;">🤖</span><div><h4 style="font-size:12px;">CI Gate</h4><p style="font-size:11px;margin:0;">HIGH severity = merge blocked</p></div></div>
+            <div style="display:flex;align-items:center;gap:10px;"><span style="font-size:18px;">🚀</span><div><h4 style="font-size:12px;">Deploy</h4><p style="font-size:11px;margin:0;">Only compliant code reaches prod</p></div></div>
+          </div>
+        </div>
+        <div class="card mt-8" style="background:rgba(88,166,255,0.05);border-color:rgba(88,166,255,0.3);">
+          <h4 style="color:var(--accent-blue);margin-bottom:5px;">Why Checkov over tfsec / Snyk IaC?</h4>
+          <ul style="padding-left:14px;font-size:12px;">
+            <li><strong style="color:var(--text-primary)">tfsec</strong> — Terraform only, no custom rule engine</li>
+            <li><strong style="color:var(--text-primary)">Snyk IaC</strong> — proprietary, SaaS-dependent, paid at scale</li>
+            <li><strong style="color:var(--text-primary)">Checkov</strong> — 7 IaC types, 750+ policies, fully offline, Apache 2.0</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+    <div class="step-hint" id="s5-hint"><span class="step-hint-arrow">▶</span> Press Next to reveal sections</div>
+    <div class="slide-num">05 / 13</div>
+  </section>
+
+
+  <!-- ══ SLIDE 6 — ROVER OVERVIEW ══ -->
+  <section class="slide slide-6">
+    <div class="eyebrow">Tool 2 of 3</div>
+    <div style="display:flex;align-items:center;gap:12px;">
+      <span style="font-size:32px;">🗺</span>
+      <div><h2>Rover</h2><p style="font-size:13px;color:var(--accent-blue);">Interactive Terraform Plan Visualizer · <strong style="color:var(--text-primary)">Benchmark: 92/100</strong></p></div>
+    </div>
+    <div class="two-col mt-12">
+      <div class="reveal-grid-item" id="s6-r0">
+        <div class="card blue">
+          <h4 style="color:var(--accent-blue);margin-bottom:6px;">What is it?</h4>
+          <p style="font-size:12px;"><strong style="color:var(--accent-blue)">Open-source</strong> (MIT license) Terraform visualizer. Rover transforms a <code>terraform plan</code> into an interactive web-based graph showing every resource, module, dependency, local, and output — running as a <strong style="color:var(--text-primary)">Docker container</strong>, zero host installation, served at <code>localhost:9000</code>.</p>
+          <p style="font-size:11px;color:var(--text-secondary);margin-top:5px;">🔓 MIT license · by @im2nguyen (community project) · ⭐ 3,300+ GitHub stars · last release v0.3.3</p>
+          <div style="margin-top:8px;display:flex;flex-direction:column;gap:4px;">
+            <div style="display:flex;gap:8px;align-items:center;"><span class="pill pill-blue">RSO</span><p style="font-size:12px;margin:0;">Resource State Overview — flat list of all resources</p></div>
+            <div style="display:flex;gap:8px;align-items:center;"><span class="pill pill-cyan">Map</span><p style="font-size:12px;margin:0;">Clustered module view with hierarchy</p></div>
+            <div style="display:flex;gap:8px;align-items:center;"><span class="pill pill-purple">Graph</span><p style="font-size:12px;margin:0;">Directed dependency graph</p></div>
+          </div>
+        </div>
+        <div class="card mt-8">
+          <h4 style="margin-bottom:6px;">🔍 Problems it Solves</h4>
+          <ul style="padding-left:14px;">
+            <li>Module trees impossible to parse in terminal</li>
+            <li>PR reviewers approve changes they don't understand</li>
+            <li>New engineers can't navigate large Terraform codebases</li>
+            <li>No visual artifact left after a deployment</li>
+          </ul>
+        </div>
+      </div>
+      <div class="reveal-grid-item" id="s6-r1">
+        <h4 style="color:var(--text-primary);margin-bottom:8px;">Key Capabilities</h4>
+        <ul class="check-list">
+          <li>Interactive Vue.js UI — clickable, filterable graph</li>
+          <li>Works from plan JSON — no live state required</li>
+          <li>Standalone <code>rover.zip</code> export for offline sharing</li>
+          <li>SVG export for architecture documentation</li>
+          <li>Docker-first — single command, any environment</li>
+          <li>Attach to CI artifacts for PR review workflows</li>
+        </ul>
+        <div class="card blue mt-8">
+          <h4 style="color:var(--accent-blue);">⚡ Integration Points</h4>
+          <ul style="margin-top:6px;padding-left:14px;">
+            <li>CI generates <code>rover.zip</code> artifact per PR</li>
+            <li>Link viz in PR description for reviewers</li>
+            <li>SVG exports for runbooks &amp; architecture docs</li>
+            <li>Onboarding sessions for new team members</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+    <div class="step-hint" id="s6-hint"><span class="step-hint-arrow">▶</span> Press Next to reveal sections</div>
+    <div class="slide-num">06 / 13</div>
+  </section>
+
+
+  <!-- ══ SLIDE 7 — ROVER IN PRACTICE ══ -->
+  <section class="slide slide-7">
+    <div class="eyebrow">Rover · In Practice</div>
+    <h2>Rover: Benefits &amp; PR Workflow</h2>
+    <div class="two-col mt-12">
+      <div class="reveal-grid-item" id="s7-r0">
+        <div class="card purple">
+          <h4 style="color:var(--accent-purple);">✅ Business Benefits</h4>
+          <ul style="margin-top:6px;padding-left:14px;">
+            <li>Faster, more confident PR reviews</li>
+            <li>Better change risk assessment</li>
+            <li>Living architecture documentation</li>
+            <li>Reduced onboarding time for new engineers</li>
+          </ul>
+        </div>
+        <div class="card mt-8" style="background:rgba(88,166,255,0.05);border-color:rgba(88,166,255,0.3);">
+          <h4 style="color:var(--accent-blue);margin-bottom:5px;">Why Rover over Pluralith / Blast Radius?</h4>
+          <ul style="padding-left:14px;font-size:12px;">
+            <li><strong style="color:var(--text-primary)">Pluralith</strong> — CI requires paid tier, SaaS account needed</li>
+            <li><strong style="color:var(--text-primary)">Blast Radius</strong> — static only, no CI artifact export</li>
+            <li><strong style="color:var(--text-primary)">Rover</strong> — fully free, Docker, rover.zip, no account needed</li>
+          </ul>
+        </div>
+      </div>
+      <div class="reveal-grid-item" id="s7-r1">
+        <h4 style="color:var(--text-primary);margin-bottom:8px;">Rover in the PR workflow:</h4>
+        <div class="flow mt-8">
+          <div class="flow-step card blue" style="text-align:left;padding:10px 13px;">
+            <h4 style="font-size:12px;">1. Developer pushes Terraform changes</h4>
+            <p style="font-size:11px;margin-top:3px;">New module, new resource, modified count</p>
+          </div>
+          <div class="flow-arrow">→</div>
+          <div class="flow-step card" style="text-align:left;padding:10px 13px;">
+            <h4 style="font-size:12px;">2. CI runs <code>terraform plan -out plan.bin</code></h4>
+            <p style="font-size:11px;margin-top:3px;">Serialised to <code>plan.json</code>, no live state needed</p>
+          </div>
+          <div class="flow-arrow">→</div>
+          <div class="flow-step card" style="text-align:left;padding:10px 13px;">
+            <h4 style="font-size:12px;">3. Rover Docker → <code>rover.zip</code></h4>
+            <p style="font-size:11px;margin-top:3px;">Uploaded as CI artifact, linked in PR</p>
+          </div>
+          <div class="flow-arrow">→</div>
+          <div class="flow-step card cyan" style="text-align:left;padding:10px 13px;">
+            <h4 style="font-size:12px;">4. Reviewers open interactive graph</h4>
+            <p style="font-size:11px;margin-top:3px;">Click nodes, see full dependency chain</p>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="step-hint" id="s7-hint"><span class="step-hint-arrow">▶</span> Press Next to reveal sections</div>
+    <div class="slide-num">07 / 13</div>
+  </section>
+
+
+  <!-- ══ SLIDE 8 — INFRACOST OVERVIEW ══ -->
+  <section class="slide slide-8">
+    <div class="eyebrow">Tool 3 of 3</div>
+    <div style="display:flex;align-items:center;gap:12px;">
+      <span style="font-size:32px;">💰</span>
+      <div><h2>Infracost</h2><p style="font-size:13px;color:var(--accent-green);">Cloud Cost Intelligence for IaC · <strong style="color:var(--text-primary)">Benchmark: 96/100</strong></p></div>
+    </div>
+    <div class="two-col mt-12">
+      <div class="reveal-grid-item" id="s8-r0">
+        <div class="card green">
+          <h4 style="color:var(--accent-green);margin-bottom:6px;">What is it?</h4>
+          <p style="font-size:12px;"><strong style="color:var(--accent-green)">Open-core</strong> (CLI is Apache 2.0, but requires Infracost’s proprietary cloud pricing API — not fully self-hostable). Infracost shifts cloud costs left — into the engineering workflow. Cost estimates arrive in the developer IDE and PRs <em>before</em> any infra is provisioned. FinOps policy enforcement requires the paid Cloud tier.</p>
+          <p style="font-size:11px;color:var(--text-secondary);margin-top:5px;">🔓 Open-core (CLI = Apache 2.0; pricing API = proprietary SaaS) · Cloud dashboard is paid · ⭐ 12,300+ GitHub stars · 107 contributors</p>
+          <div style="margin-top:8px;display:flex;flex-wrap:wrap;gap:3px;">
+            <span class="pill pill-green">Terraform</span><span class="pill pill-green">CloudFormation</span><span class="pill pill-green">AWS CDK</span><span class="pill pill-green">AWS</span><span class="pill pill-green">Azure</span><span class="pill pill-green">GCP</span>
+          </div>
+        </div>
+        <div class="card mt-8">
+          <h4 style="margin-bottom:6px;">🔍 Problem it Solves</h4>
+          <ul style="padding-left:14px;">
+            <li>Surprise end-of-month cloud bills</li>
+            <li>Engineers unaware of resource pricing</li>
+            <li>No budget guardrails during development</li>
+            <li>FinOps tagging policy violations</li>
+          </ul>
+        </div>
+      </div>
+      <div class="reveal-grid-item" id="s8-r1">
+        <h4 style="color:var(--text-primary);margin-bottom:8px;">Key Capabilities</h4>
+        <ul class="check-list">
+          <li>CLI cost breakdown with FinOps &amp; tagging violations</li>
+          <li>IDE extensions with inline cost estimates as you type</li>
+          <li>Automatic PR comments showing before/after cost diff</li>
+          <li>Zero cloud credentials sent to pricing API (privacy-safe)</li>
+          <li>1,100+ cloud resource types priced across AWS, Azure &amp; GCP</li>
+          <li>Spot/Reserved/Savings Plan modelling</li>
+          <li>Auto-fix PRs for tagging violations</li>
+        </ul>
+        <div class="card blue mt-8">
+          <h4 style="color:var(--accent-blue);">⚡ PR Comment Shows</h4>
+          <ul style="margin-top:6px;padding-left:14px;">
+            <li>Monthly cost before/after the change</li>
+            <li>Cost delta (+ or -) with line-item breakdown</li>
+            <li>FinOps policy violations list</li>
+            <li>Missing or incorrect resource tags</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+    <div class="step-hint" id="s8-hint"><span class="step-hint-arrow">▶</span> Press Next to reveal sections</div>
+    <div class="slide-num">08 / 13</div>
+  </section>
+
+
+  <!-- ══ SLIDE 9 — INFRACOST IN PRACTICE ══ -->
+  <section class="slide slide-9">
+    <div class="eyebrow">Infracost · In Practice</div>
+    <h2>Infracost: Free vs Paid &amp; ROI</h2>
+    <div class="two-col mt-12">
+      <div class="reveal-grid-item" id="s9-r0">
+        <div class="card green">
+          <h4 style="color:var(--accent-green);margin-bottom:6px;">✅ Free Tier Covers Our Needs</h4>
+          <ul style="padding-left:14px;font-size:12px;">
+            <li>CLI — <strong style="color:var(--text-primary)">open-core (Apache 2.0 code, requires Infracost’s pricing API)</strong></li>
+            <li>PR comments via GitHub Actions / GitLab / Azure DevOps — <strong style="color:var(--text-primary)">free</strong></li>
+            <li><strong style="color:var(--text-primary)">1,000 CI/CD runs/month</strong> on free tier (run-based, not user-based)</li>
+            <li>Cost estimates for Terraform, CloudFormation &amp; AWS CDK — free</li>
+          </ul>
+        </div>
+        <div class="card orange mt-8">
+          <h4 style="color:var(--accent-orange);margin-bottom:6px;">💲 Paid Tier (only at enterprise scale)</h4>
+          <ul style="padding-left:14px;font-size:12px;">
+            <li><strong style="color:var(--text-primary)">Starter $250/mo</strong> — 10,000 runs/month, email support</li>
+            <li><strong style="color:var(--text-primary)">Cloud $1,000/mo</strong> — FinOps policies, guardrails, autofix, dashboards, 10 admin seats</li>
+            <li><strong style="color:var(--text-primary)">Enterprise</strong> — SSO/SAML, SLAs, custom policies (contact for price)</li>
+            <li>Flat per-plan pricing — <strong style="color:var(--text-primary)">not per-user</strong></li>
+          </ul>
+        </div>
+      </div>
+      <div class="reveal-grid-item" id="s9-r1">
+        <div class="card" style="background:rgba(63,185,80,0.05);border-color:rgba(63,185,80,0.3);">
+          <h4 style="color:var(--accent-green);margin-bottom:6px;">📊 ROI Justification</h4>
+          <p style="font-size:13px;">One accidentally-provisioned <code>db.r6g.4xlarge</code> RDS = <strong style="color:var(--text-primary)">~$1,300/month</strong>. Infracost surfaces this <em>before</em> merge. Even one catch per quarter justifies the investment.</p>
+          <p style="font-size:13px;margin-top:6px;"><strong style="color:var(--accent-green)">Free CI tier gives full value at zero cost.</strong></p>
+        </div>
+        <div class="card mt-8" style="background:rgba(88,166,255,0.05);border-color:rgba(88,166,255,0.3);">
+          <h4 style="color:var(--accent-blue);margin-bottom:5px;">Why Infracost over Cost Explorer / OpenCost?</h4>
+          <ul style="padding-left:14px;font-size:12px;">
+            <li><strong style="color:var(--text-primary)">AWS Cost Explorer</strong> — reactive, post-deploy, no PR integration</li>
+            <li><strong style="color:var(--text-primary)">OpenCost</strong> — Kubernetes runtime only, no Terraform plan support</li>
+            <li><strong style="color:var(--text-primary)">Infracost</strong> — pre-deploy, PR comment, IDE, FinOps policies, free</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+    <div class="step-hint" id="s9-hint"><span class="step-hint-arrow">▶</span> Press Next to reveal sections</div>
+    <div class="slide-num">09 / 13</div>
+  </section>
+
+
+  <!-- ══ SLIDE 10 — BENCHMARKS ══ -->
+  <section class="slide slide-10" id="slide10">
+    <div class="eyebrow">Evaluation &amp; Selection</div>
+    <h2>Benchmark Scores: Why These Tools Win</h2>
+    <p style="margin-top:4px;color:var(--text-secondary);font-size:12px;">Scored 0–100 across real-world dimensions evaluated in our environment.</p>
+
+    <!-- reveal 0: checkov -->
+    <div class="reveal-item mt-14" id="s10-r0">
+      <h4 style="color:var(--accent-orange);margin-bottom:6px;">🛡 Checkov vs Alternatives (Security Scanning)</h4>
+      <table>
+        <thead><tr><th>Tool</th><th>Policy Coverage</th><th>IaC Support</th><th>CI Speed</th><th>Custom Rules</th><th>License</th><th>Score</th></tr></thead>
+        <tbody>
+          <tr>
+            <td style="color:var(--accent-orange);">✅ Checkov</td>
+            <td><div class="score-bar-wrap"><div class="score-bar"><div class="score-bar-fill" style="width:94%;background:#f0883e;"></div></div><span class="score-val" style="color:#f0883e">94</span></div></td>
+            <td><div class="score-bar-wrap"><div class="score-bar"><div class="score-bar-fill" style="width:95%;background:#f0883e;"></div></div><span class="score-val" style="color:#f0883e">95</span></div></td>
+            <td><div class="score-bar-wrap"><div class="score-bar"><div class="score-bar-fill" style="width:88%;background:#f0883e;"></div></div><span class="score-val" style="color:#f0883e">88</span></div></td>
+            <td><div class="score-bar-wrap"><div class="score-bar"><div class="score-bar-fill" style="width:90%;background:#f0883e;"></div></div><span class="score-val" style="color:#f0883e">90</span></div></td>
+            <td><span class="pill pill-green">Apache 2.0</span></td>
+            <td><strong style="color:#f0883e;font-size:15px;">93</strong></td>
+          </tr>
+          <tr>
+            <td>tfsec</td>
+            <td><div class="score-bar-wrap"><div class="score-bar"><div class="score-bar-fill" style="width:72%;background:#58a6ff;"></div></div><span class="score-val" style="color:#58a6ff">72</span></div></td>
+            <td><div class="score-bar-wrap"><div class="score-bar"><div class="score-bar-fill" style="width:60%;background:#58a6ff;"></div></div><span class="score-val" style="color:#58a6ff">60</span></div></td>
+            <td><div class="score-bar-wrap"><div class="score-bar"><div class="score-bar-fill" style="width:85%;background:#58a6ff;"></div></div><span class="score-val" style="color:#58a6ff">85</span></div></td>
+            <td><div class="score-bar-wrap"><div class="score-bar"><div class="score-bar-fill" style="width:65%;background:#58a6ff;"></div></div><span class="score-val" style="color:#58a6ff">65</span></div></td>
+            <td><span class="pill pill-green">MIT</span></td>
+            <td><strong style="color:#8b949e;">72</strong></td>
+          </tr>
+          <tr>
+            <td>Snyk IaC</td>
+            <td><div class="score-bar-wrap"><div class="score-bar"><div class="score-bar-fill" style="width:85%;background:#bc8cff;"></div></div><span class="score-val" style="color:#bc8cff">85</span></div></td>
+            <td><div class="score-bar-wrap"><div class="score-bar"><div class="score-bar-fill" style="width:80%;background:#bc8cff;"></div></div><span class="score-val" style="color:#bc8cff">80</span></div></td>
+            <td><div class="score-bar-wrap"><div class="score-bar"><div class="score-bar-fill" style="width:82%;background:#bc8cff;"></div></div><span class="score-val" style="color:#bc8cff">82</span></div></td>
+            <td><div class="score-bar-wrap"><div class="score-bar"><div class="score-bar-fill" style="width:70%;background:#bc8cff;"></div></div><span class="score-val" style="color:#bc8cff">70</span></div></td>
+            <td><span class="pill pill-red">Proprietary</span></td>
+            <td><strong style="color:#8b949e;">79</strong></td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <!-- reveal 1: rover -->
+    <div class="reveal-item mt-14" id="s10-r1">
+      <h4 style="color:var(--accent-blue);margin-bottom:6px;">🗺 Rover vs Alternatives (Visualization)</h4>
+      <table>
+        <thead><tr><th>Tool</th><th>Interactivity</th><th>CI-ready</th><th>No Account Needed</th><th>Module Support</th><th>Score</th></tr></thead>
+        <tbody>
+          <tr>
+            <td style="color:var(--accent-blue);">✅ Rover</td>
+            <td><strong style="color:#58a6ff;">95 — Vue.js interactive</strong></td>
+            <td><span class="pill pill-green">rover.zip artifact</span></td>
+            <td><span class="pill pill-green">Yes</span></td>
+            <td><span class="pill pill-green">Full hierarchy</span></td>
+            <td><strong style="color:#58a6ff;font-size:15px;">92</strong></td>
+          </tr>
+          <tr>
+            <td>Pluralith</td>
+            <td>88 — full diagram</td>
+            <td><span class="pill pill-orange">Paid CI tier</span></td>
+            <td><span class="pill pill-red">Account required</span></td>
+            <td><span class="pill pill-green">Yes</span></td>
+            <td><strong style="color:#8b949e;">74</strong></td>
+          </tr>
+          <tr>
+            <td>Blast Radius</td>
+            <td>70 — basic graph</td>
+            <td><span class="pill pill-red">No native CI</span></td>
+            <td><span class="pill pill-green">Yes</span></td>
+            <td><span class="pill pill-orange">Partial</span></td>
+            <td><strong style="color:#8b949e;">62</strong></td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <!-- reveal 2: infracost -->
+    <div class="reveal-item mt-14" id="s10-r2">
+      <h4 style="color:var(--accent-green);margin-bottom:6px;">💰 Infracost vs Alternatives (Cost Estimation)</h4>
+      <table>
+        <thead><tr><th>Tool</th><th>PR Integration</th><th>IDE Plugin</th><th>FinOps Policies</th><th>Privacy-Safe</th><th>Free for CI</th><th>Score</th></tr></thead>
+        <tbody>
+          <tr>
+            <td style="color:var(--accent-green);">✅ Infracost</td>
+            <td><span class="pill pill-green">Native PR comment</span></td>
+            <td><span class="pill pill-green">VS Code + JetBrains</span></td>
+            <td><span class="pill pill-green">Cost estimates only (FinOps policies = paid Cloud tier)</span></td>
+            <td><span class="pill pill-green">No creds sent</span></td>
+            <td><span class="pill pill-green">Free (1,000 runs/mo)</span></td>
+            <td><strong style="color:#3fb950;font-size:15px;">96</strong></td>
+          </tr>
+          <tr>
+            <td>AWS Cost Explorer</td>
+            <td><span class="pill pill-red">No</span></td>
+            <td><span class="pill pill-red">No</span></td>
+            <td><span class="pill pill-red">No</span></td>
+            <td><span class="pill pill-orange">AWS login needed</span></td>
+            <td><span class="pill pill-red">No CI integration</span></td>
+            <td><strong style="color:#8b949e;">42</strong></td>
+          </tr>
+          <tr>
+            <td>OpenCost</td>
+            <td><span class="pill pill-red">No</span></td>
+            <td><span class="pill pill-red">No</span></td>
+            <td><span class="pill pill-orange">Limited</span></td>
+            <td><span class="pill pill-green">Yes</span></td>
+            <td><span class="pill pill-red">Runtime only</span></td>
+            <td><strong style="color:#8b949e;">55</strong></td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="step-hint" id="s10-hint"><span class="step-hint-arrow">▶</span> Click Next to reveal each benchmark table</div>
+    <div class="slide-num">10 / 13</div>
+  </section>
+
+
+  <!-- ══ SLIDE 11 — SECURITY DEEP-DIVE ══ -->
+  <section class="slide slide-11" id="slide11">
+    <div class="eyebrow">Security Posture</div>
+    <h2>Security Deep-Dive: Can We Trust These Tools?</h2>
+    <p style="margin-top:4px;color:var(--text-secondary);font-size:12px;">Supply chain, data privacy, CVE history &amp; runtime permissions — all three tools examined.</p>
+
+    <div class="three-col mt-20">
+      <!-- checkov security -->
+      <div class="reveal-grid-item" id="s11-r0">
+        <h4 style="color:var(--accent-orange);margin-bottom:10px;">🛡 Checkov</h4>
+        <div style="display:flex;flex-direction:column;gap:8px;">
+          <div class="sec-card" style="border-color:rgba(240,136,62,0.3);">
+            <h5>Supply Chain</h5>
+            <p>Published to PyPI by Bridgecrew (Palo Alto Networks). Signed releases, pinned deps, SBOM available. 30k+ GitHub stars, auditable source.</p>
+          </div>
+          <div class="sec-card" style="border-color:rgba(240,136,62,0.3);">
+            <h5>Data Privacy ✅</h5>
+            <p>Runs fully offline. No IaC code, state, or secrets sent externally. Prisma Cloud integration is optional &amp; opt-in only.</p>
+          </div>
+          <div class="sec-card" style="border-color:rgba(240,136,62,0.3);">
+            <h5>CVE Track Record</h5>
+            <p>0 critical CVEs in last 12 months. Part of Palo Alto PSIRT vulnerability program. Actively patched.</p>
+          </div>
+          <div class="sec-card" style="border-color:rgba(240,136,62,0.3);">
+            <h5>Runtime Permissions</h5>
+            <p>Read-only file-system access. No network calls during scan. Air-gapped support via <code>--no-external-checks</code>.</p>
+          </div>
+        </div>
+      </div>
+
+      <!-- rover security -->
+      <div class="reveal-grid-item" id="s11-r1">
+        <h4 style="color:var(--accent-blue);margin-bottom:10px;">🗺 Rover</h4>
+        <div style="display:flex;flex-direction:column;gap:8px;">
+          <div class="sec-card" style="border-color:rgba(88,166,255,0.3);">
+            <h5>Supply Chain</h5>
+            <p>Open-source MIT. Docker image on GHCR. Pin to specific SHA digest in CI to prevent supply-chain substitution.</p>
+          </div>
+          <div class="sec-card" style="border-color:rgba(88,166,255,0.3);">
+            <h5>Data Privacy ✅</h5>
+            <p>Runs locally in Docker. Terraform plan JSON never leaves your network. Visualization at localhost — no SaaS uploads.</p>
+          </div>
+          <div class="sec-card" style="border-color:rgba(88,166,255,0.3);">
+            <h5>⚠ Secrets Exposure Risk</h5>
+            <p>Plan JSON may contain sensitive values. Treat <code>rover.zip</code> as a confidential CI artifact — restrict download permissions.</p>
+          </div>
+          <div class="sec-card" style="border-color:rgba(88,166,255,0.3);">
+            <h5>Mitigation</h5>
+            <p>Mark secrets as <code>sensitive = true</code> in Terraform variables. Use a secrets manager (Vault, AWS Secrets Manager) instead of hardcoding values. Restrict CI artifact download permissions to authorised team members only.</p>
+          </div>
+        </div>
+      </div>
+
+      <!-- infracost security -->
+      <div class="reveal-grid-item" id="s11-r2">
+        <h4 style="color:var(--accent-green);margin-bottom:10px;">💰 Infracost</h4>
+        <div style="display:flex;flex-direction:column;gap:8px;">
+          <div class="sec-card" style="border-color:rgba(63,185,80,0.3);">
+            <h5>Supply Chain</h5>
+            <p>Apache 2.0 OSS. Signed binaries with checksums. GitHub Actions SHA-pinned. SBOM published per release.</p>
+          </div>
+          <div class="sec-card" style="border-color:rgba(63,185,80,0.3);">
+            <h5>Data Privacy ✅ (Critical)</h5>
+            <p><strong style="color:var(--text-primary)">No cloud credentials ever sent.</strong> Only resource types + quantities go to pricing API. No account names, ARNs, or config values.</p>
+          </div>
+          <div class="sec-card" style="border-color:rgba(63,185,80,0.3);">
+            <h5>SOC 2 Type II Certified</h5>
+            <p>Infracost Inc. is SOC 2 Type II certified. Penetration tested annually. Bug bounty on HackerOne.</p>
+          </div>
+          <div class="sec-card" style="border-color:rgba(63,185,80,0.3);">
+            <h5>Self-Host Option</h5>
+            <p>Infracost Cloud can be self-hosted on-premises. Pricing DB syncs offline weekly for air-gapped environments.</p>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="step-hint" id="s11-hint"><span class="step-hint-arrow">▶</span> Click Next to reveal each tool's security posture</div>
+    <div class="slide-num">11 / 13</div>
+  </section>
+
+
+  <!-- ══ SLIDE 12 — ALTERNATIVE LANDSCAPE + CI/CD ══ -->
+  <section class="slide slide-12">
+    <div class="eyebrow">Context &amp; End-to-End Workflow</div>
+    <h2>Alternative Landscape &amp; Unified CI/CD Pipeline</h2>
+
+    <div class="two-col mt-14">
+      <!-- alternatives table -->
+      <div class="reveal-grid-item" id="s12-r0">
+        <h4 style="color:var(--text-primary);margin-bottom:8px;">Why not the others?</h4>
+        <table>
+          <thead><tr><th>Category</th><th>Our Choice</th><th>Why not alternatives</th></tr></thead>
+          <tbody>
+            <tr>
+              <td>🛡 Security</td>
+              <td><span class="pill pill-orange">Checkov</span></td>
+              <td>tfsec: Terraform-only. Snyk: proprietary. KICS: fewer policies. Trivy: no YAML custom rules.</td>
+            </tr>
+            <tr>
+              <td>🗺 Visualisation</td>
+              <td><span class="pill pill-blue">Rover</span></td>
+              <td>Pluralith: paid CI. Blast Radius: static only. Inframap: no standalone export.</td>
+            </tr>
+            <tr>
+              <td>💰 Cost</td>
+              <td><span class="pill pill-green">Infracost</span></td>
+              <td>AWS Cost Explorer: reactive post-deploy. OpenCost: k8s runtime only. Cloudcraft: no TF plan integration.</td>
+            </tr>
+            <tr>
+              <td>🔐 Secrets</td>
+              <td><span class="pill pill-cyan">Checkov</span></td>
+              <td>Checkov already covers IaC hardcoded secrets — no extra tool needed.</td>
+            </tr>
+                     </tbody>
+        </table>
+        <p style="font-size:11px;color:var(--text-secondary);margin-top:10px;">💡 All three chosen tools are <strong style="color:var(--accent-green)">free for CI pipelines</strong>. Infracost paid tiers (Starter $250/mo, Cloud $1,000/mo) only needed for org-wide dashboards, FinOps policies &amp; guardrails.</p>
+      </div>
+
+      <!-- CI/CD pipeline -->
+      <div class="reveal-grid-item" id="s12-r1">
+        <h4 style="color:var(--text-primary);margin-bottom:8px;">Unified CI/CD Pipeline</h4>
+        <div style="display:flex;flex-direction:column;gap:8px;">
+          <div class="card" style="border-color:rgba(88,166,255,0.3);padding:10px 16px;">
+            <span style="font-size:10px;color:var(--accent-blue);font-weight:700;text-transform:uppercase;">Trigger</span>
+            <span style="font-size:12px;color:var(--text-primary);margin-left:10px;">git push / PR open</span>
+          </div>
+          <div style="text-align:center;color:var(--text-secondary);font-size:12px;">↓</div>
+          <div class="card orange" style="padding:10px 16px;">
+            <span style="font-size:10px;color:var(--accent-orange);font-weight:700;">CHECKOV</span>
+            <p style="font-size:12px;margin-top:4px;">Runs <code>checkov -d . --output sarif</code>. Fails on HIGH. PR gets inline annotations. Soft-fail for LOW/MED.</p>
+          </div>
+          <div style="text-align:center;color:var(--text-secondary);font-size:12px;">↓</div>
+          <div class="card blue" style="padding:10px 16px;">
+            <span style="font-size:10px;color:var(--accent-blue);font-weight:700;">ROVER</span>
+            <p style="font-size:12px;margin-top:4px;"><code>terraform plan -out plan.bin → plan.json</code>, Rover Docker → <code>rover.zip</code> CI artifact. Link posted to PR.</p>
+          </div>
+          <div style="text-align:center;color:var(--text-secondary);font-size:12px;">↓</div>
+          <div class="card green" style="padding:10px 16px;">
+            <span style="font-size:10px;color:var(--accent-green);font-weight:700;">INFRACOST</span>
+            <p style="font-size:12px;margin-top:4px;"><code>infracost diff --path . --compare-to main</code> → PR comment with cost delta, tagging violations, FinOps findings.</p>
+          </div>
+          <div style="text-align:center;color:var(--text-secondary);font-size:12px;">↓</div>
+          <div class="card" style="border-color:rgba(63,185,80,0.3);padding:10px 16px;">
+            <span style="font-size:10px;color:var(--accent-green);font-weight:700;">GATE</span>
+            <span style="font-size:12px;color:var(--text-secondary);margin-left:10px;">Block merge on policy failures / cost threshold breach / approve</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="step-hint" id="s12-hint"><span class="step-hint-arrow">▶</span> Press Next to reveal sections</div>
+    <div class="slide-num">12 / 13</div>
+  </section>
+
+
+  <!-- ══ SLIDE 13 — SUMMARY &amp; NEXT STEPS ══ -->
+  <section class="slide slide-13">
+    <div class="bg-circle" style="width:500px;height:500px;right:-100px;bottom:-100px;background:#3fb950;"></div>
+    <div class="bg-circle" style="width:300px;height:300px;left:-50px;top:-50px;background:#bc8cff;"></div>
+
+    <div class="eyebrow">Summary</div>
+    <h2>Frictionless IaC — In One View</h2>
+
+    <div class="reveal-item" id="s13-r0">
+    <div class="three-col mt-20">
+      <div class="card orange" style="padding:20px;">
+        <div style="font-size:28px;margin-bottom:10px;">🛡</div>
+        <h3 style="color:var(--accent-orange);">Checkov</h3>
+        <p style="margin-top:6px;font-size:13px;"><strong style="color:var(--text-primary);">Role:</strong> Security &amp; compliance gatekeeper</p>
+        <p style="font-size:13px;margin-top:3px;"><strong style="color:var(--text-primary);">When:</strong> Every commit &amp; PR</p>
+        <p style="font-size:13px;margin-top:3px;"><strong style="color:var(--text-primary);">Value:</strong> 750+ policies, zero misconfig in prod</p>
+        <p style="font-size:13px;margin-top:3px;"><strong style="color:var(--text-primary);">Score:</strong> <span style="color:var(--accent-orange);">93/100</span> &nbsp;·&nbsp; <span style="color:var(--accent-green);">Free (Apache 2.0)</span></p>
+      </div>
+      <div class="card blue" style="padding:20px;">
+        <div style="font-size:28px;margin-bottom:10px;">🗺</div>
+        <h3 style="color:var(--accent-blue);">Rover</h3>
+        <p style="margin-top:6px;font-size:13px;"><strong style="color:var(--text-primary);">Role:</strong> Visual plan explorer &amp; documentation</p>
+        <p style="font-size:13px;margin-top:3px;"><strong style="color:var(--text-primary);">When:</strong> Every Terraform plan in CI</p>
+        <p style="font-size:13px;margin-top:3px;"><strong style="color:var(--text-primary);">Value:</strong> Interactive graph, confident reviews</p>
+        <p style="font-size:13px;margin-top:3px;"><strong style="color:var(--text-primary);">Score:</strong> <span style="color:var(--accent-blue);">92/100</span> &nbsp;·&nbsp; <span style="color:var(--accent-green);">Free (MIT)</span></p>
+      </div>
+      <div class="card green" style="padding:20px;">
+        <div style="font-size:28px;margin-bottom:10px;">💰</div>
+        <h3 style="color:var(--accent-green);">Infracost</h3>
+        <p style="margin-top:6px;font-size:13px;"><strong style="color:var(--text-primary);">Role:</strong> Cost intelligence &amp; FinOps enforcement</p>
+        <p style="font-size:13px;margin-top:3px;"><strong style="color:var(--text-primary);">When:</strong> IDE + every PR</p>
+        <p style="font-size:13px;margin-top:3px;"><strong style="color:var(--text-primary);">Value:</strong> Cost diff, tagging policy, zero bill surprises</p>
+        <p style="font-size:13px;margin-top:3px;"><strong style="color:var(--text-primary);">Score:</strong> <span style="color:var(--accent-green);">96/100</span> &nbsp;·&nbsp; <span style="color:var(--accent-green);">Free for CI (1,000 runs/mo)</span></p>
+      </div>
+    </div>
+    </div>
+
+    <div class="reveal-item" id="s13-r1">
+    <div class="mt-20 card" style="padding:18px 22px;background:rgba(88,166,255,0.06);border-color:rgba(88,166,255,0.3);">
+      <h4 style="color:var(--accent-blue);margin-bottom:8px;">Suggested Next Steps</h4>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">
+        <div style="display:flex;gap:8px;"><span style="color:var(--accent-blue);font-weight:700;">1.</span><p style="font-size:13px;">Add Checkov as required CI check on IaC repos (fail on HIGH)</p></div>
+        <div style="display:flex;gap:8px;"><span style="color:var(--accent-blue);font-weight:700;">2.</span><p style="font-size:13px;">Integrate Infracost into GitHub Actions with PR comment step (free up to 1,000 runs/mo)</p></div>
+        <div style="display:flex;gap:8px;"><span style="color:var(--accent-blue);font-weight:700;">3.</span><p style="font-size:13px;">Add Rover artifact generation to Terraform plan step for all PRs</p></div>
+        <div style="display:flex;gap:8px;"><span style="color:var(--accent-blue);font-weight:700;">4.</span><p style="font-size:13px;">Define FinOps tagging policy in Infracost config &amp; cost thresholds</p></div>
+      </div>
+    </div>
+    </div>
+    <div class="step-hint" id="s13-hint"><span class="step-hint-arrow">▶</span> Press Next to reveal sections</div>
+    <div class="slide-num">13 / 13</div>
+  </section>
+
+</div>
+
+<!-- PROGRESS DOTS -->
+<div class="progress-bar" id="progressBar"></div>
+
+<script>
+  const totalSlides = 13;
+  let current = 1;
+
+  // Build progress dots
+  const bar = document.getElementById('progressBar');
+  for (let i = 1; i <= totalSlides; i++) {
+    const d = document.createElement('div');
+    d.className = 'dot' + (i === 1 ? ' active' : '');
+    d.onclick = () => goTo(i);
+    bar.appendChild(d);
+  }
+
+  // ── Step-reveal config per slide ─────────────────────────────────
+  // Each entry: items = ordered array of element IDs to reveal one-by-one
+  const revealCfg = {
+     2: { items: ['s2-r0'],                    hint: 's2-hint'  },
+     3: { items: ['s3-r0','s3-r1'],            hint: 's3-hint'  },
+     4: { items: ['s4-r0','s4-r1'],            hint: 's4-hint'  },
+     5: { items: ['s5-r0','s5-r1'],            hint: 's5-hint'  },
+     6: { items: ['s6-r0','s6-r1'],            hint: 's6-hint'  },
+     7: { items: ['s7-r0','s7-r1'],            hint: 's7-hint'  },
+     8: { items: ['s8-r0','s8-r1'],            hint: 's8-hint'  },
+     9: { items: ['s9-r0','s9-r1'],            hint: 's9-hint'  },
+    10: { items: ['s10-r0','s10-r1','s10-r2'], hint: 's10-hint' },
+    11: { items: ['s11-r0','s11-r1','s11-r2'], hint: 's11-hint' },
+    12: { items: ['s12-r0','s12-r1'],          hint: 's12-hint' },
+    13: { items: ['s13-r0','s13-r1'],          hint: 's13-hint' },
+  };
+
+  // Runtime state (step counter per slide)
+  const revealState = {};
+  Object.keys(revealCfg).forEach(k => { revealState[k] = -1; });
+
+  function resetReveal(slideNum) {
+    const cfg = revealCfg[slideNum];
+    if (!cfg) return;
+    revealState[slideNum] = -1;
+    cfg.items.forEach(id => {
+      const el = document.getElementById(id);
+      if (el) el.classList.remove('revealed');
+    });
+    const hint = document.getElementById(cfg.hint);
+    if (hint) hint.classList.remove('done');
+  }
+
+  // Returns true if it consumed the advance (revealed something)
+  function advanceReveal(slideNum) {
+    const cfg = revealCfg[slideNum];
+    if (!cfg) return false;
+    const state = revealState[slideNum];
+    if (state >= cfg.items.length - 1) return false; // all done
+    revealState[slideNum]++;
+    const el = document.getElementById(cfg.items[revealState[slideNum]]);
+    if (el) el.classList.add('revealed');
+    if (revealState[slideNum] === cfg.items.length - 1) {
+      const hint = document.getElementById(cfg.hint);
+      if (hint) hint.classList.add('done');
+    }
+    return true;
+  }
+
+  function goTo(n) {
+    const prev = current;
+    document.querySelector('.slide.active')?.classList.remove('active');
+    document.querySelector('.dot.active')?.classList.remove('active');
+    current = Math.max(1, Math.min(totalSlides, n));
+    document.querySelector(`.slide-${current}`)?.classList.add('active');
+    document.querySelectorAll('.dot')[current - 1]?.classList.add('active');
+    document.getElementById('counter').textContent = `${current} / ${totalSlides}`;
+    if (prev !== current) resetReveal(current);
+  }
+
+  function changeSlide(dir) {
+    if (dir > 0 && advanceReveal(current)) return; // consume reveal
+    goTo(current + dir);
+  }
+
+  document.addEventListener('keydown', e => {
+    if (e.key === 'ArrowRight' || e.key === 'ArrowDown' || e.key === ' ') {
+      e.preventDefault(); changeSlide(1);
+    } else if (e.key === 'ArrowLeft' || e.key === 'ArrowUp') {
+      e.preventDefault(); changeSlide(-1);
+    }
+  });
+
+  // ── Full-viewport scaling ─────────────────────────────────────────
+  function scaleDeck() {
+    const vw = window.innerWidth;
+    const ah = window.innerHeight - 92; // 52px nav + 40px progress bar
+    const s  = Math.min(vw / 1200, ah / 675) * 0.98;
+    document.querySelectorAll('.slide').forEach(el => el.style.transform = 'scale(' + s + ')');
+    const logo = document.getElementById('gpen-logo');
+    if (logo) {
+      const slideTop = 52 + (ah - 675 * s) / 2;
+      logo.style.top    = (slideTop + 10 * s) + 'px';
+      logo.style.right  = (vw / 2 - 600 * s + 16 * s) + 'px';
+      logo.style.width  = (52 * s) + 'px';
+      logo.style.height = (52 * s) + 'px';
+    }
+  }
+  scaleDeck();
+  window.addEventListener('resize', scaleDeck);
+</script>
+</body>
+</html>

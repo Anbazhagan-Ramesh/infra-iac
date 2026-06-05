@@ -1,72 +1,55 @@
-# infra-iac
+# Frictionless IaC Demo
 
-Infrastructure as Code (IaC) repository for provisioning and managing cloud infrastructure.
+This repository contains the source code and CI/CD pipeline for the "Frictionless IaC" demonstration. It showcases how to integrate security, cost estimation, and visualization directly into the developer workflow for Infrastructure as Code (IaC).
 
-## Overview
+The goal is to "shift-left" these critical checks, providing developers with immediate, actionable feedback within their pull requests. This approach helps catch issues early, reduces risk, and fosters a culture of accountability and collaboration.
 
-This repository contains infrastructure definitions managed as code, enabling repeatable, version-controlled, and automated provisioning of cloud resources.
+## The "Frictionless" Workflow
+
+This demo uses a single GitHub Actions workflow (`.github/workflows/iac-demo.yml`) to orchestrate three powerful open-source tools on every pull request against Terraform code:
+
+1.  🛡️ **[Checkov](https://www.checkov.io/)**: Performs static analysis to find security vulnerabilities and misconfigurations.
+2.  💰 **[Infracost](https://www.infracost.io/)**: Generates a cost estimate to show the financial impact of infrastructure changes.
+3.  🗺️ **[Rover](https://im2nguyen.github.io/rover/)**: Creates an interactive visualization of the Terraform plan, making changes easier to understand.
+
+When a pull request is opened, the workflow runs and posts the results as comments, giving developers and reviewers a comprehensive overview before merging.
+
+![Frictionless IaC Workflow](https://user-images.githubusercontent.com/843981/236894717-9b4b8a7e-3bbf-4f9f-9a2c-8a5a0a8b8d1e.png)
 
 ## Repository Structure
 
 ```
 infra-iac/
-├── modules/        # Reusable infrastructure modules
-├── environments/   # Environment-specific configurations (dev, staging, prod)
-├── scripts/        # Helper and automation scripts
+├── .github/
+│   └── workflows/
+│       └── iac-demo.yml      # The core GitHub Actions workflow
+├── terraform/
+│   ├── main.tf               # Sample Terraform configuration
+│   └── ...
 └── README.md
 ```
 
-## Prerequisites
-
-- [Terraform](https://developer.hashicorp.com/terraform/downloads) >= 1.0
-- Cloud provider CLI (e.g., AWS CLI, Azure CLI, or gcloud)
-- Appropriate credentials configured for your target cloud environment
-
 ## Getting Started
 
-1. **Clone the repository**
-   ```bash
-   git clone https://github.com/Anbazhagan-Ramesh/infra-iac.git
-   cd infra-iac
-   ```
+To see the workflow in action, you can fork this repository and open a pull request with a change to any of the files in the `terraform/` directory.
 
-2. **Initialize Terraform**
-   ```bash
-   terraform init
-   ```
+### Prerequisites
 
-3. **Review the plan**
-   ```bash
-   terraform plan
-   ```
+- A GitHub account.
+- An [Infracost API Key](https://www.infracost.io/docs/cloud_pricing/get_api_key/) (the free tier is sufficient). Add this as a repository secret named `INFRACOST_API_KEY`.
 
-4. **Apply the changes**
-   ```bash
-   terraform apply
-   ```
+### Running the Demo
 
-## Environments
+1.  **Fork this repository.**
+2.  **Add the `INFRACOST_API_KEY` secret** to your forked repository's Settings > Secrets and variables > Actions.
+3.  **Create a new branch** and make a change to `terraform/main.tf`. For example, you could change the machine type of a VM or add a new resource.
+4.  **Push the branch and open a pull request.**
 
-| Environment | Description              |
-|-------------|--------------------------|
-| `dev`       | Development environment  |
-| `staging`   | Pre-production testing   |
-| `prod`      | Production environment   |
+Once the pull request is open, the `iac-checks` workflow will trigger automatically. After a few minutes, you will see comments on your pull request from Checkov and Infracost, and a link to the Rover visualization will be available in the workflow summary artifacts.
 
-## Branching Strategy
+## Presentation
 
-| Branch    | Purpose                              |
-|-----------|--------------------------------------|
-| `main`    | Stable, production-ready code        |
-| `develop` | Integration branch for new features  |
-| `feature/*` | Individual feature development     |
-
-## Contributing
-
-1. Create a feature branch from `main`
-2. Make your changes and test locally
-3. Open a Pull Request against `main`
-4. Ensure all checks pass before merging
+This repository supports the "Frictionless Infrastructure: Transforming the IaC Experience" presentation. The slides can be viewed [here](https://anbazhagan-ramesh.github.io/infra-iac/presentation.html).
 
 ## License
 
